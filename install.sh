@@ -3,12 +3,16 @@
 # Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/install.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.2.0
+# Version     : v1.3.0
 # Date        : 2026-04-25
 # Target      : Install Friture audio spectrum analyzer in a dedicated Python
 #               venv for Kali Linux at a fixed project installation folder
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.3.0 – 2026-04-25 – Python runtime compatibility hardening
+#               - detect and use a Python interpreter < 3.13 for venv creation
+#               - auto-try python3.12 installation in --install when unavailable
+#               - block incompatible pip fallback on Python 3.13+
 #   v1.2.0 – 2026-04-25 – Python 3.13 compatibility fix
 #               - prefer apt package `friture` during --exec to avoid pip build
 #                 failures with legacy numpy on Python 3.13
@@ -34,7 +38,7 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="install.sh"
-SCRIPT_VERSION="v1.2.0"
+SCRIPT_VERSION="v1.3.0"
 SCRIPT_DATE="2026-04-25"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
@@ -51,6 +55,8 @@ SIMULATE=false
 DO_EXEC=false
 STEP=0
 TOTAL_STEPS=7
+SELECTED_PYTHON=""
+SELECTED_PYTHON_VERSION=""
 
 # System packages required
 SYS_DEPS=("python3-venv" "python3-pyqt5" "python3-pyqt5.qtopengl" "python3-pip")
@@ -180,6 +186,11 @@ show_changelog() {
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
 
+  v1.3.0 – 2026-04-25 – ${AUTHOR}
+    - Added compatible interpreter detection (< 3.13) for venv creation
+    - Added optional python3.12 installation attempt during --install
+    - Blocked pip fallback when only Python 3.13+ is available
+
   v1.2.0 – 2026-04-25 – ${AUTHOR}
     - Prefer apt package `friture` for Python 3.13 compatibility
     - Keep pip fallback only if apt package is unavailable
@@ -237,6 +248,16 @@ check_prereqs() {
         missing+=("python3-pip")
     fi
 
+    # Check compatible interpreter for venv (< 3.13)
+    if detect_compatible_python; then
+        log "  [OK]      compatible venv interpreter: ${SELECTED_PYTHON} (${SELECTED_PYTHON_VERSION})"
+    else
+        log "  [MISSING] compatible venv interpreter (< 3.13)"
+        log "            Recommended: python3.12 + python3.12-venv"
+        missing+=("python3.12")
+        missing+=("python3.12-venv")
+    fi
+
     # Report
     if [[ ${#missing[@]} -eq 0 ]]; then
         log "All prerequisites satisfied."
@@ -247,6 +268,37 @@ check_prereqs() {
     fi
 }
 
+# Return success only if interpreter version is < 3.13
+is_compatible_python() {
+    local py="$1"
+    "${py}" -c 'import sys; raise SystemExit(0 if sys.version_info < (3, 13) else 1)'
+}
+
+# Detect best available interpreter (<3.13) for venv creation
+detect_compatible_python() {
+    local candidates=("python3.12" "python3.11" "python3.10" "python3.9")
+    local py
+    for py in "${candidates[@]}"; do
+        if command -v "${py}" &>/dev/null; then
+            if is_compatible_python "${py}"; then
+                SELECTED_PYTHON="${py}"
+                SELECTED_PYTHON_VERSION="$(${py} --version 2>&1)"
+                return 0
+            fi
+        fi
+    done
+
+    if command -v python3 &>/dev/null && is_compatible_python python3; then
+        SELECTED_PYTHON="python3"
+        SELECTED_PYTHON_VERSION="$(python3 --version 2>&1)"
+        return 0
+    fi
+
+    SELECTED_PYTHON=""
+    SELECTED_PYTHON_VERSION=""
+    return 1
+}
+
 # =============================================================================
 # INSTALL SYSTEM PREREQUISITES
 # =============================================================================
@@ -254,6 +306,11 @@ install_prereqs() {
     step "Installing system prerequisites via apt"
     run_cmd "apt update" apt-get update -qq
     run_cmd "apt install system deps" apt-get install -y "${SYS_DEPS[@]}"
+    if ! detect_compatible_python; then
+        if apt-cache show python3.12 &>/dev/null && apt-cache show python3.12-venv &>/dev/null; then
+            run_cmd "apt install python3.12 and python3.12-venv" apt-get install -y python3.12 python3.12-venv
+        fi
+    fi
     log "System prerequisites installed."
 }
 
@@ -277,11 +334,31 @@ do_exec() {
 
     # Step 2 – Create venv
     step "Creating Python venv at ${VENV_DIR}"
+    if ! detect_compatible_python; then
+        log "[ERROR] No compatible Python interpreter (< 3.13) found."
+        log "[ERROR] Python 3.13+ cannot build current pip fallback dependencies for friture."
+        log "[ERROR] Run: ./${SCRIPT_NAME} --install  (will try installing python3.12 if available)."
+        exit 1
+    fi
+    log "  Using interpreter for venv: ${SELECTED_PYTHON} (${SELECTED_PYTHON_VERSION})"
     if [[ -d "${VENV_DIR}" ]]; then
-        log "  venv already exists at ${VENV_DIR} – skipping creation"
+        if [[ -x "${VENV_DIR}/bin/python" ]] && "${VENV_DIR}/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info < (3, 13) else 1)'; then
+            log "  existing venv is compatible – skipping recreation"
+        else
+            log "  [WARN] existing venv is incompatible (Python 3.13+ or broken). Recreating with ${SELECTED_PYTHON}."
+            if [[ "${SIMULATE}" == true ]]; then
+                log "[SIMULATE] Would remove venv: ${VENV_DIR}"
+                run_cmd "${SELECTED_PYTHON} -m venv" "${SELECTED_PYTHON}" -m venv "${VENV_DIR}" --system-site-packages
+            else
+                rm -rf "${VENV_DIR}"
+                mkdir -p "$(dirname "${VENV_DIR}")"
+                run_cmd "${SELECTED_PYTHON} -m venv" "${SELECTED_PYTHON}" -m venv "${VENV_DIR}" --system-site-packages
+            fi
+            log "  venv recreated at ${VENV_DIR}"
+        fi
     else
         mkdir -p "$(dirname "${VENV_DIR}")"
-        run_cmd "python3 -m venv" python3 -m venv "${VENV_DIR}" --system-site-packages
+        run_cmd "${SELECTED_PYTHON} -m venv" "${SELECTED_PYTHON}" -m venv "${VENV_DIR}" --system-site-packages
         log "  venv created at ${VENV_DIR}"
     fi
 
@@ -297,7 +374,7 @@ do_exec() {
 
     # Step 4 – Upgrade pip inside venv
     step "Upgrading pip inside venv"
-    run_cmd "pip upgrade" pip install --upgrade pip
+    run_cmd "pip upgrade" "${VENV_DIR}/bin/python" -m pip install --upgrade pip
 
     # Step 5 – Install friture (apt preferred, pip fallback)
     step "Installing friture (apt preferred, pip fallback)"
@@ -312,7 +389,15 @@ do_exec() {
             fi
         else
             log "  [WARN] apt package 'friture' not found. Falling back to pip."
-            run_cmd "pip install friture" pip install friture
+            if [[ "${SIMULATE}" == true ]]; then
+                run_cmd "pip install friture" "${VENV_DIR}/bin/python" -m pip install friture
+            elif [[ -x "${VENV_DIR}/bin/python" ]] && "${VENV_DIR}/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info < (3, 13) else 1)'; then
+                run_cmd "pip install friture" "${VENV_DIR}/bin/python" -m pip install friture
+            else
+                log "[ERROR] Pip fallback blocked: venv Python is 3.13+ and known to fail with current friture backend dependencies."
+                log "[ERROR] Install python3.12 + python3.12-venv, then rerun --exec to recreate a compatible venv."
+                exit 1
+            fi
         fi
     fi
 

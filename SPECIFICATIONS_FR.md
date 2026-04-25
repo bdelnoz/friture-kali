@@ -2,8 +2,8 @@
 Document : SPECIFICATIONS_FR.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.2.0
-Date : 2026-04-25 12:15
+Version : v1.3.0
+Date : 2026-04-25 12:45
 -->
 # SPECIFICATIONS_FR.md
 
@@ -18,7 +18,7 @@ Cette spécification couvre :
 - le comportement et la maintenance de `install.sh`
 - le comportement et la maintenance de `run.sh`
 - les exigences de dossier d'installation fixe et de venv fixe
-- la stratégie d'installation compatible Python 3.13 pour Friture
+- la stratégie de compatibilité runtime Python pour l'installation de Friture
 - les documents compagnons obligatoires
 - les logs et artefacts de résultats
 
@@ -56,9 +56,10 @@ Fichiers racine actuels :
 - supporte : `--help`, `--exec`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`, `--stop`
 - vérifie/installe les prérequis apt (`python3-venv`, `python3-pyqt5`, `python3-pyqt5.qtopengl`, `python3-pip`)
 - crée et utilise le chemin venv fixe
+- sélectionne un interpréteur compatible `< 3.13` pour créer le venv
 - installe Friture avec stratégie apt-first :
   - priorité à `apt install friture`
-  - fallback vers `pip install friture` seulement si le paquet apt est indisponible
+  - fallback vers `pip install friture` seulement si le paquet apt est indisponible et si l'interpréteur est compatible
 - écrit les logs dans `./logs`
 - écrit un résumé d'exécution dans `./results`
 
@@ -82,7 +83,8 @@ Fichiers racine actuels :
 5. Les tâches liées aux scripts DOIVENT synchroniser `README.md`, `CHANGELOG.md`, `INSTALL.md`, `WHY.md`.
 6. `SPECIFICATIONS.md` et `SPECIFICATIONS_FR.md` DOIVENT rester synchronisés (version/date/sens).
 7. L'installation de Friture DOIT privilégier apt pour compatibilité Python 3.13.
-8. La validation runtime DOIT accepter la commande `friture` installée système.
+8. Le fallback pip DOIT être bloqué si seul Python 3.13+ est disponible.
+9. La validation runtime DOIT accepter la commande `friture` installée système.
 
 ## Exigences non fonctionnelles
 
@@ -142,11 +144,13 @@ La tâche est acceptée quand :
 
 1. les scripts implémentent la politique de dossier racine fixe et venv fixe,
 2. la metadata/version/changelog scripts sont mis à jour,
-3. la stratégie d'installation apt-first de Friture est implémentée,
-4. le runtime accepte la commande système Friture si binaire venv absent,
-5. les documents compagnons obligatoires existent et sont synchronisés,
-6. `SPECIFICATIONS.md` et `SPECIFICATIONS_FR.md` sont synchronisés,
-7. les vérifications de syntaxe passent.
+3. la détection d'interpréteur compatible (<3.13) est implémentée pour créer le venv,
+4. la stratégie d'installation apt-first de Friture est implémentée,
+5. le fallback pip est bloqué sur Python 3.13+,
+6. le runtime accepte la commande système Friture si binaire venv absent,
+7. les documents compagnons obligatoires existent et sont synchronisés,
+8. `SPECIFICATIONS.md` et `SPECIFICATIONS_FR.md` sont synchronisés,
+9. les vérifications de syntaxe passent.
 
 ## Hors périmètre
 
@@ -155,6 +159,22 @@ La tâche est acceptée quand :
 - ajout de traitement cloud/web externe
 
 ## Changelog
+
+### v1.3.0 — 2026-04-25 12:45 — Bruno DELNOZ
+
+Raison/contexte :
+- L'utilisateur a signalé un échec persistant quand le paquet apt n'était pas disponible et que le fallback pip tentait un build legacy sous Python 3.13.
+
+Ajouts :
+- Ajout de l'exigence de détection d'interpréteur compatible (<3.13) pour créer le venv.
+- Ajout de l'exigence de blocage du fallback pip sur Python 3.13+.
+
+Modifications :
+- Mise à jour des exigences d'installation avec sélection d'interpréteur et fallback pip sécurisé.
+- Mise à jour des critères d'acceptation avec contrôles de compatibilité runtime Python.
+
+Suppressions :
+- Aucune.
 
 ### v1.2.0 — 2026-04-25 12:15 — Bruno DELNOZ
 

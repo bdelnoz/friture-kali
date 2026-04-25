@@ -2,8 +2,8 @@
 Document : INSTALL.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.2.0
-Date : 2026-04-25 12:15
+Version : v1.3.0
+Date : 2026-04-25 12:45
 -->
 # INSTALL
 
@@ -25,16 +25,16 @@ All operations are aligned to this fixed path:
 cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
 ```
 
-2. Check prerequisites:
-
-```bash
-./install.sh --prerequis
-```
-
-3. (Optional) Install prerequisite packages only:
+2. Install prerequisite packages (recommended):
 
 ```bash
 ./install.sh --install
+```
+
+3. Check prerequisites:
+
+```bash
+./install.sh --prerequis
 ```
 
 4. Run complete installation:
@@ -43,7 +43,10 @@ cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
 ./install.sh --exec
 ```
 
-`--exec` prefers `apt install friture` and falls back to `pip install friture` only when the apt package is unavailable.
+`--exec` will:
+- select a compatible Python interpreter `< 3.13` for venv creation,
+- prefer `apt install friture`,
+- fallback to `pip install friture` only if apt package is unavailable and Python is compatible.
 
 5. Launch Friture:
 
