@@ -2,8 +2,8 @@
 Document : WHY.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.1.0
-Date : 2026-04-25 10:30
+Version : v1.3.0
+Date : 2026-04-25 12:45
 -->
 # WHY
 
@@ -18,6 +18,14 @@ A fixed installation root improves reproducibility on the target machine and avo
 ## Why a dedicated venv
 
 Kali environments can be sensitive to system Python package management. A dedicated project venv isolates package installation while still allowing required system Qt packages through `--system-site-packages`.
+
+## Why Python compatibility detection
+
+Some backend dependencies used during pip builds for Friture are not compatible with Python 3.13 yet (for example legacy modules removed from stdlib). Detecting and using Python `< 3.13` prevents these failures.
+
+## Why apt-first installation for Friture
+
+Preferring the distro package (`apt install friture`) is more stable on rolling distributions and avoids fragile source builds.
 
 ## Why explicit shell scripts
 
