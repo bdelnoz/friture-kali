@@ -26,3 +26,8 @@ backup/
 *.rar
 certs/
 secrets/
+
+# Added automatically by install.sh
+/logs
+/results
+/venv
