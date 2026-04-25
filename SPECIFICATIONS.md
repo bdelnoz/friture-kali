@@ -2,267 +2,168 @@
 Document : SPECIFICATIONS.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.0.0
-Date : 2026-04-25 01:55
+Version : v1.1.0
+Date : 2026-04-25 10:30
 -->
 # SPECIFICATIONS.md
 
 ## Purpose
 
-Define the functional and technical specifications for a Kali Linux real-time audio frequency monitoring system using a Blue Yeti USB microphone.
-
-The objective is to detect specific sound events (notably whistle-like high-frequency sounds) in real time, with future support for automated alerting, timestamped evidence generation, and dashboard integration.
-
----
+Define the complete, validated repository specifications for `friture-kali`, including script behavior, fixed installation policy, documentation synchronization, and acceptance criteria.
 
 ## Scope
 
-This project covers:
+This specification covers:
 
-- live microphone capture from Blue Yeti
-- real-time spectrum analysis
-- frequency band monitoring
-- configurable dB threshold detection
-- future automatic alert triggering
-- future ntfy.sh notification support
-- future integration with the existing Python dashboard
+- `install.sh` behavior and maintenance
+- `run.sh` behavior and maintenance
+- fixed installation root and fixed venv requirements
+- required companion documentation files
+- logs and results artifact behavior
 
-This project does not initially cover:
+This specification does not cover:
 
-- post-recording offline-only analysis
-- Windows support
-- Bluetooth audio devices
-- cloud-hosted processing
+- cloud telemetry
+- non-Linux execution
+- replacing shell scripts with another implementation language
 
----
+## Existing verified behavior
 
-## Existing Verified Behavior
+### Repository files
 
-### Environment
+Current root files:
 
-- OS: Kali Linux
-- Primary workstation: koutoubia
-- User preference: Kali repositories only when possible
-- No AppImage preferred
-- No Windows solutions
+- `AGENTS.md`
+- `README.md`
+- `SPECIFICATIONS.md`
+- `SPECIFICATIONS_FR.md`
+- `CHANGELOG.md`
+- `INSTALL.md`
+- `WHY.md`
+- `install.sh`
+- `run.sh`
 
-### Audio Device
+### Fixed installation policy
 
-Verified ALSA capture device:
+- Installation root is fixed to:
+  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali`
+- Virtual environment is fixed to:
+  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/venv/friture`
 
-```text
-card 2 : Yeti Stereo Microphone
-device 0 : USB Audio
-```
+### `install.sh`
 
-Operational ALSA target:
+- supports: `--help`, `--exec`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`, `--stop`
+- checks/install prerequisites via apt (`python3-venv`, `python3-pyqt5`, `python3-pyqt5.qtopengl`, `python3-pip`)
+- creates and uses fixed venv path
+- installs `friture` inside venv
+- writes logs under `./logs`
+- writes execution summary under `./results`
 
-```text
-plughw:2,0
-```
+### `run.sh`
 
-### Tested Tool
+- supports: `--help`, `--exec`, `--stop`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`
+- validates fixed install root and fixed venv
+- checks optional Blue Yeti ALSA presence
+- launches `friture` from fixed venv
+- manages PID via `/tmp/friture.pid`
+- writes logs under `./logs`
 
-JAAA verified:
+## Functional requirements
 
-```text
-Version: 0.9.2
-```
+1. Scripts MUST keep full documented CLI behavior and options.
+2. Scripts MUST enforce/use fixed installation root paths.
+3. Scripts MUST use the fixed project venv path.
+4. Script updates MUST include version/date/changelog updates.
+5. Script-related tasks MUST synchronize `README.md`, `CHANGELOG.md`, `INSTALL.md`, and `WHY.md`.
+6. `SPECIFICATIONS.md` and `SPECIFICATIONS_FR.md` MUST remain synchronized in version/date/meaning.
 
-Findings:
+## Non-functional requirements
 
-- live spectrum display works
-- limited interface for advanced monitoring
-- no clean persistent preset system
-- GUI settings are not fully reproducible via CLI
-
----
-
-## Functional Requirements
-
-### FR-01 Live Frequency Visualization
-
-The system must display audio frequencies in real time directly from the microphone.
-
-### FR-02 Live dB Level Monitoring
-
-The system must display live amplitude levels in dB.
-
-### FR-03 Frequency Band Targeting
-
-The system must allow monitoring of specific frequency ranges.
-
-Examples:
-
-- 2 kHz → 5 kHz
-- 8 kHz → 12 kHz
-- up to 20+ kHz for very high-pitched whistles
-
-### FR-04 Configurable Trigger Threshold
-
-The user must be able to define a threshold level that triggers an event.
-
-### FR-05 Future Alerting
-
-The system must support future automated actions when a threshold is exceeded.
-
-Examples:
-
-- dashboard alert
-- ntfy.sh push notification
-- local log entry
-
-### FR-06 Evidence Preservation
-
-The system should support future timestamped evidence generation.
-
-Examples:
-
-- saved audio snippet
-- generated spectrogram
-- detection event log
-
----
-
-## Non-Functional Requirements
-
-- real-time behavior required
-- low latency preferred
-- minimal package footprint preferred
-- HTTPS-only external access if needed
-- strong reproducibility
-- forensic-friendly traceability
-- Linux-native workflow only
-
----
+- Kali Linux first
+- reproducible behavior
+- safe-by-default and non-destructive by default
+- explicit logs and traceability
+- no fabricated execution claims
 
 ## Inputs
 
-### Primary Input
-
-- Blue Yeti USB microphone
-
-### Configuration Inputs
-
-- target frequency range
-- trigger threshold in dB
-- alert mode selection
-- destination for logs/results
-
----
+- CLI flags for `install.sh` and `run.sh`
+- local apt/system package state
+- local ALSA device state
+- local repository state
 
 ## Outputs
 
-### Immediate Outputs
+- deterministic script operations
+- logs in `./logs`
+- result files in `./results` when generated
+- synchronized repository documentation and specifications
 
-- live spectrum display
-- live dB levels
-- visual frequency monitoring
+## Files and directories concerned
 
-### Future Outputs
+- `install.sh`
+- `run.sh`
+- `README.md`
+- `CHANGELOG.md`
+- `INSTALL.md`
+- `WHY.md`
+- `SPECIFICATIONS.md`
+- `SPECIFICATIONS_FR.md`
+- `./logs/`
+- `./results/`
 
-- detection logs
-- saved evidence files
-- spectrogram exports
-- dashboard alerts
-- ntfy.sh notifications
+## Interfaces and commands
 
----
+- `./install.sh --help|--exec|--prerequis|--install|--simulate|--changelog|--purge|--stop`
+- `./run.sh --help|--exec|--stop|--prerequis|--install|--simulate|--changelog|--purge`
 
-## Files and Directories Concerned
+Validation checks:
 
-Expected repository structure:
+- `bash -n install.sh`
+- `bash -n run.sh`
 
-```text
-./README.md
-./WHY.md
-./INSTALL.md
-./CHANGELOG.md
-./SPECIFICATIONS.md
-./SPECIFICATIONS_FR.md
-./logs/
-./results/
-```
+## Constraints and safety rules
 
----
-
-## Interfaces and Commands
-
-### ALSA verification
-
-```bash
-arecord -l
-```
-
-### Live capture test
-
-```bash
-arecord -D plughw:2,0 -f S16_LE -c 2 -r 44100 -V mono /tmp/test.wav
-```
-
-### Existing analyzer
-
-```bash
-jaaa -A -C plughw:2,0
-```
-
-Future implementation may use:
-
-- Python
-- NumPy
-- SciPy
-- sounddevice
-- ffmpeg
-- ntfy.sh
-
----
-
-## Constraints and Safety Rules
-
-- no assumptions presented as facts
-- only verified technical statements
-- preserve evidence integrity
+- keep existing features unless explicitly requested otherwise
 - avoid destructive actions by default
-- no external dependency if avoidable
-- no outbound exposure of collected data without explicit approval
+- preserve historical changelog entries (append-only)
+- maintain English repository deliverables except `SPECIFICATIONS_FR.md`
 
----
+## Validation and acceptance criteria
 
-## Validation and Acceptance Criteria
+Task is accepted when:
 
-The project is considered valid when:
+1. scripts implement fixed root and fixed venv policy,
+2. script metadata/version/changelog are updated,
+3. required companion documentation files exist and are synchronized,
+4. `SPECIFICATIONS.md` and `SPECIFICATIONS_FR.md` are synchronized,
+5. syntax checks pass.
 
-- the microphone is reliably captured
-- targeted frequency bands are visible in real time
-- threshold conditions are configurable
-- detections can be observed consistently
-- the system is suitable for documenting repeated whistle events
+## Out-of-scope items
 
----
-
-## Out-of-Scope Items
-
-- legal interpretation
-- identity attribution of the source person
-- law enforcement conclusions
-- remote cloud analytics
-- mobile app implementation
-
----
+- legal interpretation of sound evidence
+- identity attribution from audio
+- external web/cloud processing additions
 
 ## Changelog
+
+### v1.1.0 — 2026-04-25 10:30 — Bruno DELNOZ
+
+Reason/context:
+- Repository-wide maintenance with script bug review and mandatory fixed Kali installation root/venv requirement.
+
+Additions:
+- Added fixed installation root and fixed venv requirements.
+- Added explicit companion documentation synchronization state.
+- Added synchronized `SPECIFICATIONS_FR.md` requirement in current repository state.
+
+Modifications:
+- Updated verified behavior sections to match current scripts and docs.
+- Updated acceptance criteria to include fixed path policy validation.
+
+Removals:
+- None.
 
 ### v1.0.0 — 2026-04-25 01:55 — Bruno DELNOZ
 
 Initial specification created from verified repository and conversation state.
-
-Added:
-
-- project purpose
-- real-time audio monitoring scope
-- verified ALSA microphone configuration
-- JAAA baseline validation
-- functional requirements
-- future automation direction
-- evidence preservation objective
-
