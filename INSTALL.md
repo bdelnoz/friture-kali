@@ -2,8 +2,8 @@
 Document : INSTALL.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.1.0
-Date : 2026-04-25 10:30
+Version : v1.2.0
+Date : 2026-04-25 12:15
 -->
 # INSTALL
 
@@ -31,7 +31,7 @@ cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
 ./install.sh --prerequis
 ```
 
-3. Install system prerequisites (if needed):
+3. (Optional) Install prerequisite packages only:
 
 ```bash
 ./install.sh --install
@@ -42,6 +42,8 @@ cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
 ```bash
 ./install.sh --exec
 ```
+
+`--exec` prefers `apt install friture` and falls back to `pip install friture` only when the apt package is unavailable.
 
 5. Launch Friture:
 
