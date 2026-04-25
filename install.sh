@@ -3,12 +3,17 @@
 # Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/install.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.1.0
+# Version     : v1.2.0
 # Date        : 2026-04-25
 # Target      : Install Friture audio spectrum analyzer in a dedicated Python
 #               venv for Kali Linux at a fixed project installation folder
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.2.0 – 2026-04-25 – Python 3.13 compatibility fix
+#               - prefer apt package `friture` during --exec to avoid pip build
+#                 failures with legacy numpy on Python 3.13
+#               - keep pip fallback only when apt package is unavailable
+#               - keep fixed installation root and fixed venv policy
 #   v1.1.0 – 2026-04-25 – Fixed installation root and venv location for Kali
 #               - fixed INSTALL_ROOT path to /mnt/data2_78g/.../friture-kali
 #               - venv now created in INSTALL_ROOT/venv/friture
@@ -29,7 +34,7 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="install.sh"
-SCRIPT_VERSION="v1.1.0"
+SCRIPT_VERSION="v1.2.0"
 SCRIPT_DATE="2026-04-25"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
@@ -45,7 +50,7 @@ LOG_FILE="${LOGS_DIR}/log.${SCRIPT_NAME}.${TIMESTAMP}.${SCRIPT_VERSION}.log"
 SIMULATE=false
 DO_EXEC=false
 STEP=0
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 
 # System packages required
 SYS_DEPS=("python3-venv" "python3-pyqt5" "python3-pyqt5.qtopengl" "python3-pip")
@@ -175,6 +180,11 @@ show_changelog() {
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
 
+  v1.2.0 – 2026-04-25 – ${AUTHOR}
+    - Prefer apt package `friture` for Python 3.13 compatibility
+    - Keep pip fallback only if apt package is unavailable
+    - Preserve fixed INSTALL_ROOT and fixed VENV_DIR policy
+
   v1.1.0 – 2026-04-25 – ${AUTHOR}
     - Fixed installation root to ${INSTALL_ROOT}
     - Venv moved to ${VENV_DIR}
@@ -289,9 +299,22 @@ do_exec() {
     step "Upgrading pip inside venv"
     run_cmd "pip upgrade" pip install --upgrade pip
 
-    # Step 5 – Install friture
-    step "Installing friture via pip"
-    run_cmd "pip install friture" pip install friture
+    # Step 5 – Install friture (apt preferred, pip fallback)
+    step "Installing friture (apt preferred, pip fallback)"
+    if command -v friture &>/dev/null; then
+        log "  friture command already available in PATH – skipping installation"
+    else
+        if apt-cache show friture &>/dev/null; then
+            if [[ $EUID -ne 0 ]]; then
+                run_cmd "apt install friture (sudo)" sudo -E apt-get install -y friture
+            else
+                run_cmd "apt install friture" apt-get install -y friture
+            fi
+        else
+            log "  [WARN] apt package 'friture' not found. Falling back to pip."
+            run_cmd "pip install friture" pip install friture
+        fi
+    fi
 
     # Step 6 – Write results summary
     step "Writing installation summary"
@@ -303,7 +326,7 @@ do_exec() {
             echo "Script      : ${SCRIPT_NAME} ${SCRIPT_VERSION}"
             echo "INSTALL_ROOT: ${INSTALL_ROOT}"
             echo "VENV_DIR    : ${VENV_DIR}"
-            echo "Friture ver : $(pip show friture 2>/dev/null | grep Version || echo 'unknown')"
+            echo "Friture cmd : $(command -v friture 2>/dev/null || echo 'not found')"
         } > "${result_file}"
         log "  Result written to ${result_file}"
     fi
@@ -322,7 +345,7 @@ do_exec() {
     echo "  3. venv creation at ${VENV_DIR}"
     echo "  4. venv activation"
     echo "  5. pip upgrade"
-    echo "  6. friture installed via pip"
+    echo "  6. friture installation checked/performed (apt preferred)"
     echo "  7. Result summary written"
 }
 

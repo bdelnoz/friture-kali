@@ -2,8 +2,8 @@
 Document : SPECIFICATIONS.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.1.0
-Date : 2026-04-25 10:30
+Version : v1.2.0
+Date : 2026-04-25 12:15
 -->
 # SPECIFICATIONS.md
 
@@ -18,6 +18,7 @@ This specification covers:
 - `install.sh` behavior and maintenance
 - `run.sh` behavior and maintenance
 - fixed installation root and fixed venv requirements
+- Python 3.13-compatible installation strategy for Friture
 - required companion documentation files
 - logs and results artifact behavior
 
@@ -55,7 +56,9 @@ Current root files:
 - supports: `--help`, `--exec`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`, `--stop`
 - checks/install prerequisites via apt (`python3-venv`, `python3-pyqt5`, `python3-pyqt5.qtopengl`, `python3-pip`)
 - creates and uses fixed venv path
-- installs `friture` inside venv
+- installs Friture with apt-first strategy:
+  - prefer `apt install friture`
+  - fallback to `pip install friture` only if apt package is unavailable
 - writes logs under `./logs`
 - writes execution summary under `./results`
 
@@ -64,7 +67,9 @@ Current root files:
 - supports: `--help`, `--exec`, `--stop`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`
 - validates fixed install root and fixed venv
 - checks optional Blue Yeti ALSA presence
-- launches `friture` from fixed venv
+- accepts Friture command from either:
+  - `${INSTALL_ROOT}/venv/friture/bin/friture`
+  - system PATH (`/usr/bin/friture` or equivalent)
 - manages PID via `/tmp/friture.pid`
 - writes logs under `./logs`
 
@@ -76,6 +81,8 @@ Current root files:
 4. Script updates MUST include version/date/changelog updates.
 5. Script-related tasks MUST synchronize `README.md`, `CHANGELOG.md`, `INSTALL.md`, and `WHY.md`.
 6. `SPECIFICATIONS.md` and `SPECIFICATIONS_FR.md` MUST remain synchronized in version/date/meaning.
+7. Friture installation MUST prefer apt package manager for Python 3.13 compatibility.
+8. Runtime validation MUST accept apt-installed system `friture` command.
 
 ## Non-functional requirements
 
@@ -135,9 +142,11 @@ Task is accepted when:
 
 1. scripts implement fixed root and fixed venv policy,
 2. script metadata/version/changelog are updated,
-3. required companion documentation files exist and are synchronized,
-4. `SPECIFICATIONS.md` and `SPECIFICATIONS_FR.md` are synchronized,
-5. syntax checks pass.
+3. apt-first install strategy for Friture is implemented,
+4. runtime accepts system Friture command if venv binary is absent,
+5. required companion documentation files exist and are synchronized,
+6. `SPECIFICATIONS.md` and `SPECIFICATIONS_FR.md` are synchronized,
+7. syntax checks pass.
 
 ## Out-of-scope items
 
@@ -146,6 +155,22 @@ Task is accepted when:
 - external web/cloud processing additions
 
 ## Changelog
+
+### v1.2.0 — 2026-04-25 12:15 — Bruno DELNOZ
+
+Reason/context:
+- Runtime failure reported when `pip install friture` attempted to build legacy numpy dependency on Python 3.13.
+
+Additions:
+- Added apt-first Friture installation strategy requirement.
+- Added runtime acceptance requirement for system-installed `friture` command.
+
+Modifications:
+- Updated verified script behavior to include apt-first install and system PATH fallback.
+- Updated acceptance criteria with Python 3.13 compatibility handling.
+
+Removals:
+- None.
 
 ### v1.1.0 — 2026-04-25 10:30 — Bruno DELNOZ
 
