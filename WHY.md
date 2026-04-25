@@ -2,8 +2,8 @@
 Document : WHY.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.1.0
-Date : 2026-04-25 10:30
+Version : v1.4.0
+Date : 2026-04-25 13:10
 -->
 # WHY
 
@@ -11,20 +11,12 @@ Date : 2026-04-25 10:30
 
 `friture-kali` exists to provide a reliable and repeatable way to run Friture on Kali Linux with a dedicated venv and explicit operational scripts.
 
-## Why a fixed installation root
+## Why layered fallbacks are required
 
-A fixed installation root improves reproducibility on the target machine and avoids path drift between installations.
+Kali rolling environments can expose Python/runtime compatibility gaps. A single install method can fail depending on package availability and Python minor version.
 
-## Why a dedicated venv
-
-Kali environments can be sensitive to system Python package management. A dedicated project venv isolates package installation while still allowing required system Qt packages through `--system-site-packages`.
-
-## Why explicit shell scripts
-
-The scripts provide:
-
-- deterministic CLI behavior,
-- prerequisite checks,
-- dry-run (`--simulate`) support,
-- logs and execution traceability,
-- ready-to-use operational commands.
+The installer therefore uses a layered strategy:
+- compatible interpreter when available,
+- apt-first package install,
+- guarded pip fallback,
+- git fallback when needed.

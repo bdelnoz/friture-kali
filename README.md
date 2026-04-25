@@ -2,8 +2,8 @@
 Document : README.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.1.0
-Date : 2026-04-25 10:30
+Version : v1.4.0
+Date : 2026-04-25 13:10
 -->
 # friture-kali
 
@@ -18,38 +18,27 @@ This repository provides operational Kali Linux scripts to install and run **Fri
 - Dedicated virtual environment path is fixed to:
   - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/venv/friture`
 
+## Installation strategy (no-dead-end)
+
+`install.sh --exec` now uses this order:
+
+1. prefer a compatible Python interpreter `< 3.13` when available
+2. create/recreate the venv if incompatible
+3. prefer system package install: `apt install friture`
+4. fallback to `pip install friture` when compatible
+5. if Python 3.13+ blocks standard pip fallback, try git fallback:
+   - `pip install git+https://github.com/tlecomte/friture.git`
+
 ## Main Scripts
 
-- `install.sh`: installs system prerequisites, creates the fixed venv, installs `friture`.
-- `run.sh`: verifies prerequisites and launches `friture` from the fixed venv.
+- `install.sh`: installs prerequisites, creates fixed venv, and installs `friture` with layered fallback logic.
+- `run.sh`: verifies prerequisites and launches `friture` from fixed venv/system path.
 
 ## Quick Start
 
 ```bash
 cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
-./install.sh --exec
-./run.sh --exec
-```
-
-## Common Commands
-
-```bash
-./install.sh --help
-./install.sh --prerequis
 ./install.sh --install
 ./install.sh --exec
-
-./run.sh --help
-./run.sh --prerequis
 ./run.sh --exec
-./run.sh --stop
 ```
-
-## Runtime Artifacts
-
-- Logs: `./logs/log.<script_name>.<full_timestamp>.<script_version>.log`
-- Results: `./results/`
-
-## Author
-
-Bruno DELNOZ — bruno.delnoz@protonmail.com

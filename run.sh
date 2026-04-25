@@ -3,12 +3,15 @@
 # Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/run.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.1.0
+# Version     : v1.2.0
 # Date        : 2026-04-25
 # Target      : Launch Friture from fixed Kali project installation root using
 #               a dedicated Python venv and optional Blue Yeti checks
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.2.0 – 2026-04-25 – Runtime compatibility with apt-based install
+#               - accept system `friture` command when venv binary is absent
+#               - keep fixed installation root and fixed venv policy
 #   v1.1.0 – 2026-04-25 – Fixed root path and venv policy
 #               - fixed INSTALL_ROOT path to /mnt/data2_78g/.../friture-kali
 #               - venv path aligned to INSTALL_ROOT/venv/friture
@@ -28,7 +31,7 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="run.sh"
-SCRIPT_VERSION="v1.1.0"
+SCRIPT_VERSION="v1.2.0"
 SCRIPT_DATE="2026-04-25"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
@@ -166,6 +169,10 @@ show_changelog() {
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
 
+  v1.2.0 – 2026-04-25 – ${AUTHOR}
+    - Accept system `friture` command when venv binary is absent
+    - Preserve fixed INSTALL_ROOT and fixed VENV_DIR policy
+
   v1.1.0 – 2026-04-25 – ${AUTHOR}
     - Fixed installation root to ${INSTALL_ROOT}
     - Venv path moved to ${VENV_DIR}
@@ -205,11 +212,13 @@ check_prereqs() {
         ok=false
     fi
 
-    # Check friture binary inside venv
+    # Check friture command availability
     if [[ -f "${VENV_DIR}/bin/friture" ]]; then
         log "  [OK]      friture binary present in venv"
+    elif command -v friture &>/dev/null; then
+        log "  [OK]      friture command available in system PATH ($(command -v friture))"
     else
-        log "  [MISSING] friture not installed in venv"
+        log "  [MISSING] friture not found in venv and not available in system PATH"
         log "            Run: ${INSTALL_ROOT}/install.sh --exec"
         ok=false
     fi

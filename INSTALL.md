@@ -2,8 +2,8 @@
 Document : INSTALL.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.1.0
-Date : 2026-04-25 10:30
+Version : v1.4.0
+Date : 2026-04-25 13:10
 -->
 # INSTALL
 
@@ -19,39 +19,15 @@ All operations are aligned to this fixed path:
 
 ## Steps
 
-1. Go to the project folder:
+1. `cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali`
+2. `./install.sh --install`
+3. `./install.sh --exec`
+4. `./run.sh --exec`
 
-```bash
-cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
-```
+## Installer behavior
 
-2. Check prerequisites:
-
-```bash
-./install.sh --prerequis
-```
-
-3. Install system prerequisites (if needed):
-
-```bash
-./install.sh --install
-```
-
-4. Run complete installation:
-
-```bash
-./install.sh --exec
-```
-
-5. Launch Friture:
-
-```bash
-./run.sh --exec
-```
-
-## Notes
-
-- The virtual environment is created at:
-  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/venv/friture`
-- Logs are written in `./logs`.
-- Result summaries are written in `./results`.
+`--exec` applies layered fallback:
+- compatible Python `< 3.13` when available,
+- apt-first install (`apt install friture`),
+- standard pip fallback when compatible,
+- git-based pip fallback on Python 3.13+ environments if needed.

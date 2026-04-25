@@ -3,12 +3,25 @@
 # Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/install.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.1.0
+# Version     : v1.4.0
 # Date        : 2026-04-25
 # Target      : Install Friture audio spectrum analyzer in a dedicated Python
 #               venv for Kali Linux at a fixed project installation folder
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.4.0 – 2026-04-25 – No-dead-end fallback for Python 3.13 environments
+#               - do not hard-stop when only Python 3.13 is available
+#               - add git-based Friture fallback from upstream repository
+#               - keep apt-first strategy and compatible-python preference
+#   v1.3.0 – 2026-04-25 – Python runtime compatibility hardening
+#               - detect and use a Python interpreter < 3.13 for venv creation
+#               - auto-try python3.12 installation in --install when unavailable
+#               - block incompatible pip fallback on Python 3.13+
+#   v1.2.0 – 2026-04-25 – Python 3.13 compatibility fix
+#               - prefer apt package `friture` during --exec to avoid pip build
+#                 failures with legacy numpy on Python 3.13
+#               - keep pip fallback only when apt package is unavailable
+#               - keep fixed installation root and fixed venv policy
 #   v1.1.0 – 2026-04-25 – Fixed installation root and venv location for Kali
 #               - fixed INSTALL_ROOT path to /mnt/data2_78g/.../friture-kali
 #               - venv now created in INSTALL_ROOT/venv/friture
@@ -29,7 +42,7 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="install.sh"
-SCRIPT_VERSION="v1.1.0"
+SCRIPT_VERSION="v1.4.0"
 SCRIPT_DATE="2026-04-25"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
@@ -45,10 +58,12 @@ LOG_FILE="${LOGS_DIR}/log.${SCRIPT_NAME}.${TIMESTAMP}.${SCRIPT_VERSION}.log"
 SIMULATE=false
 DO_EXEC=false
 STEP=0
-TOTAL_STEPS=6
+TOTAL_STEPS=7
+SELECTED_PYTHON=""
+SELECTED_PYTHON_VERSION=""
 
 # System packages required
-SYS_DEPS=("python3-venv" "python3-pyqt5" "python3-pyqt5.qtopengl" "python3-pip")
+SYS_DEPS=("python3-venv" "python3-pyqt5" "python3-pyqt5.qtopengl" "python3-pip" "git")
 
 # =============================================================================
 # INTERNAL FUNCTIONS
@@ -175,6 +190,21 @@ show_changelog() {
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
 
+  v1.4.0 – 2026-04-25 – ${AUTHOR}
+    - Added fallback path when only Python 3.13 is available
+    - Added git-based install attempt from upstream Friture repository
+    - Removed hard-stop dead-end before installation attempts
+
+  v1.3.0 – 2026-04-25 – ${AUTHOR}
+    - Added compatible interpreter detection (< 3.13) for venv creation
+    - Added optional python3.12 installation attempt during --install
+    - Blocked pip fallback when only Python 3.13+ is available
+
+  v1.2.0 – 2026-04-25 – ${AUTHOR}
+    - Prefer apt package `friture` for Python 3.13 compatibility
+    - Keep pip fallback only if apt package is unavailable
+    - Preserve fixed INSTALL_ROOT and fixed VENV_DIR policy
+
   v1.1.0 – 2026-04-25 – ${AUTHOR}
     - Fixed installation root to ${INSTALL_ROOT}
     - Venv moved to ${VENV_DIR}
@@ -227,6 +257,14 @@ check_prereqs() {
         missing+=("python3-pip")
     fi
 
+    # Check compatible interpreter for venv (< 3.13)
+    if detect_compatible_python; then
+        log "  [OK]      compatible venv interpreter: ${SELECTED_PYTHON} (${SELECTED_PYTHON_VERSION})"
+    else
+        log "  [WARN]    compatible venv interpreter (< 3.13) not found"
+        log "            Script will continue with python3 and use guarded fallback logic."
+    fi
+
     # Report
     if [[ ${#missing[@]} -eq 0 ]]; then
         log "All prerequisites satisfied."
@@ -237,6 +275,37 @@ check_prereqs() {
     fi
 }
 
+# Return success only if interpreter version is < 3.13
+is_compatible_python() {
+    local py="$1"
+    "${py}" -c 'import sys; raise SystemExit(0 if sys.version_info < (3, 13) else 1)'
+}
+
+# Detect best available interpreter (<3.13) for venv creation
+detect_compatible_python() {
+    local candidates=("python3.12" "python3.11" "python3.10" "python3.9")
+    local py
+    for py in "${candidates[@]}"; do
+        if command -v "${py}" &>/dev/null; then
+            if is_compatible_python "${py}"; then
+                SELECTED_PYTHON="${py}"
+                SELECTED_PYTHON_VERSION="$(${py} --version 2>&1)"
+                return 0
+            fi
+        fi
+    done
+
+    if command -v python3 &>/dev/null && is_compatible_python python3; then
+        SELECTED_PYTHON="python3"
+        SELECTED_PYTHON_VERSION="$(python3 --version 2>&1)"
+        return 0
+    fi
+
+    SELECTED_PYTHON=""
+    SELECTED_PYTHON_VERSION=""
+    return 1
+}
+
 # =============================================================================
 # INSTALL SYSTEM PREREQUISITES
 # =============================================================================
@@ -244,6 +313,11 @@ install_prereqs() {
     step "Installing system prerequisites via apt"
     run_cmd "apt update" apt-get update -qq
     run_cmd "apt install system deps" apt-get install -y "${SYS_DEPS[@]}"
+    if ! detect_compatible_python; then
+        if apt-cache show python3.12 &>/dev/null && apt-cache show python3.12-venv &>/dev/null; then
+            run_cmd "apt install python3.12 and python3.12-venv" apt-get install -y python3.12 python3.12-venv
+        fi
+    fi
     log "System prerequisites installed."
 }
 
@@ -267,11 +341,31 @@ do_exec() {
 
     # Step 2 – Create venv
     step "Creating Python venv at ${VENV_DIR}"
+    if ! detect_compatible_python; then
+        SELECTED_PYTHON="python3"
+        SELECTED_PYTHON_VERSION="$(python3 --version 2>&1)"
+        log "  [WARN] No Python <3.13 found. Continuing with ${SELECTED_PYTHON} (${SELECTED_PYTHON_VERSION})."
+    else
+        log "  Using interpreter for venv: ${SELECTED_PYTHON} (${SELECTED_PYTHON_VERSION})"
+    fi
     if [[ -d "${VENV_DIR}" ]]; then
-        log "  venv already exists at ${VENV_DIR} – skipping creation"
+        if [[ -x "${VENV_DIR}/bin/python" ]] && "${VENV_DIR}/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info < (3, 13) else 1)'; then
+            log "  existing venv is compatible – skipping recreation"
+        else
+            log "  [WARN] existing venv is incompatible or broken. Recreating with ${SELECTED_PYTHON}."
+            if [[ "${SIMULATE}" == true ]]; then
+                log "[SIMULATE] Would remove venv: ${VENV_DIR}"
+                run_cmd "${SELECTED_PYTHON} -m venv" "${SELECTED_PYTHON}" -m venv "${VENV_DIR}" --system-site-packages
+            else
+                rm -rf "${VENV_DIR}"
+                mkdir -p "$(dirname "${VENV_DIR}")"
+                run_cmd "${SELECTED_PYTHON} -m venv" "${SELECTED_PYTHON}" -m venv "${VENV_DIR}" --system-site-packages
+            fi
+            log "  venv recreated at ${VENV_DIR}"
+        fi
     else
         mkdir -p "$(dirname "${VENV_DIR}")"
-        run_cmd "python3 -m venv" python3 -m venv "${VENV_DIR}" --system-site-packages
+        run_cmd "${SELECTED_PYTHON} -m venv" "${SELECTED_PYTHON}" -m venv "${VENV_DIR}" --system-site-packages
         log "  venv created at ${VENV_DIR}"
     fi
 
@@ -287,11 +381,38 @@ do_exec() {
 
     # Step 4 – Upgrade pip inside venv
     step "Upgrading pip inside venv"
-    run_cmd "pip upgrade" pip install --upgrade pip
+    run_cmd "pip upgrade" "${VENV_DIR}/bin/python" -m pip install --upgrade pip
 
-    # Step 5 – Install friture
-    step "Installing friture via pip"
-    run_cmd "pip install friture" pip install friture
+    # Step 5 – Install friture (apt preferred, pip fallback)
+    step "Installing friture (apt preferred, pip fallback)"
+    if command -v friture &>/dev/null; then
+        log "  friture command already available in PATH – skipping installation"
+    else
+        if apt-cache show friture &>/dev/null; then
+            if [[ $EUID -ne 0 ]]; then
+                run_cmd "apt install friture (sudo)" sudo -E apt-get install -y friture
+            else
+                run_cmd "apt install friture" apt-get install -y friture
+            fi
+        else
+            log "  [WARN] apt package 'friture' not found. Falling back to pip."
+            if [[ "${SIMULATE}" == true ]]; then
+                run_cmd "pip install friture" "${VENV_DIR}/bin/python" -m pip install friture
+            elif [[ -x "${VENV_DIR}/bin/python" ]] && "${VENV_DIR}/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info < (3, 13) else 1)'; then
+                run_cmd "pip install friture" "${VENV_DIR}/bin/python" -m pip install friture
+            else
+                log "  [WARN] Standard pip fallback blocked on Python 3.13+."
+                log "  [WARN] Trying git-based fallback from upstream repository."
+                if run_cmd "pip install friture from git" "${VENV_DIR}/bin/python" -m pip install "git+https://github.com/tlecomte/friture.git"; then
+                    log "  git-based fallback succeeded."
+                else
+                    log "[ERROR] Git fallback failed."
+                    log "[ERROR] Please install python3.12 + python3.12-venv (if available) and rerun --exec."
+                    exit 1
+                fi
+            fi
+        fi
+    fi
 
     # Step 6 – Write results summary
     step "Writing installation summary"
@@ -303,7 +424,7 @@ do_exec() {
             echo "Script      : ${SCRIPT_NAME} ${SCRIPT_VERSION}"
             echo "INSTALL_ROOT: ${INSTALL_ROOT}"
             echo "VENV_DIR    : ${VENV_DIR}"
-            echo "Friture ver : $(pip show friture 2>/dev/null | grep Version || echo 'unknown')"
+            echo "Friture cmd : $(command -v friture 2>/dev/null || echo 'not found')"
         } > "${result_file}"
         log "  Result written to ${result_file}"
     fi
@@ -322,7 +443,7 @@ do_exec() {
     echo "  3. venv creation at ${VENV_DIR}"
     echo "  4. venv activation"
     echo "  5. pip upgrade"
-    echo "  6. friture installed via pip"
+    echo "  6. friture installation checked/performed (apt preferred)"
     echo "  7. Result summary written"
 }
 
