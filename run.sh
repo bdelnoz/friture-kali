@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Script      : /home/nox/Projects/friture-kali/run.sh
+# Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/run.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.0.0
+# Version     : v1.1.0
 # Date        : 2026-04-25
-# Target      : Launch Friture from its isolated Python venv on Kali Linux
-#               with optional Blue Yeti pre-check via ALSA
+# Target      : Launch Friture from fixed Kali project installation root using
+#               a dedicated Python venv and optional Blue Yeti checks
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.1.0 – 2026-04-25 – Fixed root path and venv policy
+#               - fixed INSTALL_ROOT path to /mnt/data2_78g/.../friture-kali
+#               - venv path aligned to INSTALL_ROOT/venv/friture
+#               - safer purge/log initialization behavior
+#               - install fallback now targets fixed install.sh path
 #   v1.0.0 – 2026-04-25 – Initial version
 #               - venv existence check before launch
 #               - ALSA Blue Yeti detection check (plughw:2,0)
@@ -23,15 +28,16 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="run.sh"
-SCRIPT_VERSION="v1.0.0"
+SCRIPT_VERSION="v1.1.0"
 SCRIPT_DATE="2026-04-25"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
 
-VENV_DIR="${HOME}/venv/friture"
+INSTALL_ROOT="/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LOGS_DIR="${SCRIPT_DIR}/logs"
-RESULTS_DIR="${SCRIPT_DIR}/results"
+VENV_DIR="${INSTALL_ROOT}/venv/friture"
+LOGS_DIR="${INSTALL_ROOT}/logs"
+RESULTS_DIR="${INSTALL_ROOT}/results"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 LOG_FILE="${LOGS_DIR}/log.${SCRIPT_NAME}.${TIMESTAMP}.${SCRIPT_VERSION}.log"
 
@@ -40,7 +46,7 @@ DO_EXEC=false
 FRITURE_PID_FILE="/tmp/friture.pid"
 
 STEP=0
-TOTAL_STEPS=4
+TOTAL_STEPS=5
 
 # Expected Blue Yeti ALSA device
 YETI_ALSA="plughw:2,0"
@@ -52,16 +58,18 @@ YETI_NAME="Yeti Stereo Microphone"
 
 # Initialize directories and .gitignore
 init_dirs() {
-    mkdir -p "${LOGS_DIR}" "${RESULTS_DIR}"
-    local gitignore="${SCRIPT_DIR}/.gitignore"
+    mkdir -p "${INSTALL_ROOT}" "${LOGS_DIR}" "${RESULTS_DIR}"
+    local gitignore="${INSTALL_ROOT}/.gitignore"
     if [[ -f "${gitignore}" ]]; then
         grep -qxF '/logs' "${gitignore}" || echo -e "\n# Added automatically by ${SCRIPT_NAME}\n/logs" >> "${gitignore}"
         grep -qxF '/results' "${gitignore}" || echo "/results" >> "${gitignore}"
+        grep -qxF '/venv' "${gitignore}" || echo "/venv" >> "${gitignore}"
     fi
 }
 
 # Timestamped log
 log() {
+    mkdir -p "${LOGS_DIR}"
     local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
     echo "${msg}"
     echo "${msg}" >> "${LOG_FILE}"
@@ -84,18 +92,29 @@ run_cmd() {
     fi
 }
 
+# Verify fixed project installation folder
+check_install_root() {
+    if [[ "${SCRIPT_DIR}" != "${INSTALL_ROOT}" ]]; then
+        log "[WARN] Script current location: ${SCRIPT_DIR}"
+        log "[WARN] Required installation root: ${INSTALL_ROOT}"
+        log "[WARN] The script will still use fixed paths under ${INSTALL_ROOT}."
+    else
+        log "[OK] Script is running from fixed installation root: ${INSTALL_ROOT}"
+    fi
+}
+
 # =============================================================================
 # HELP
 # =============================================================================
 show_help() {
-    cat <<EOF
+    cat <<EOF_HELP
 ================================================================================
   ${SCRIPT_NAME} – ${SCRIPT_VERSION} – ${AUTHOR} <${EMAIL}>
 ================================================================================
 
 DESCRIPTION
-  Launches Friture audio spectrum analyzer from its isolated Python venv.
-  Optionally checks for Blue Yeti USB microphone availability via ALSA.
+  Launches Friture audio spectrum analyzer from the fixed installation root
+  and fixed Python venv path on Kali Linux.
 
 USAGE
   ./${SCRIPT_NAME} [OPTION]
@@ -108,7 +127,7 @@ OPTIONS
   --install,   -i    Re-run install.sh if venv missing
   --simulate,  -s    Dry-run mode (no actual launch)
   --changelog, -ch   Show full changelog
-  --purge,     -pu   Remove ./logs and ./results directories
+  --purge,     -pu   Remove logs and results from fixed installation root
 
 EXAMPLES
   # Launch Friture
@@ -124,27 +143,34 @@ EXAMPLES
   ./${SCRIPT_NAME} --stop
 
 DEFAULTS
-  VENV_DIR    : ${HOME}/venv/friture
-  ALSA device : ${YETI_ALSA} (${YETI_NAME})
-  LOGS_DIR    : ./logs
-  RESULTS_DIR : ./results
+  INSTALL_ROOT : ${INSTALL_ROOT}
+  VENV_DIR     : ${VENV_DIR}
+  ALSA device  : ${YETI_ALSA} (${YETI_NAME})
+  LOGS_DIR     : ${LOGS_DIR}
+  RESULTS_DIR  : ${RESULTS_DIR}
 
 NOTES
-  - Friture must be installed first via: ./install.sh --exec
+  - Friture must be installed first via: ${INSTALL_ROOT}/install.sh --exec
   - Select input device inside Friture: Preferences → Input device → Yeti
   - No external sudo required
 ================================================================================
-EOF
+EOF_HELP
 }
 
 # =============================================================================
 # CHANGELOG
 # =============================================================================
 show_changelog() {
-    cat <<EOF
+    cat <<EOF_CHANGELOG
 ================================================================================
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
+
+  v1.1.0 – 2026-04-25 – ${AUTHOR}
+    - Fixed installation root to ${INSTALL_ROOT}
+    - Venv path moved to ${VENV_DIR}
+    - Added install root validation and warning logs
+    - Improved purge/log safety behavior
 
   v1.0.0 – 2026-04-25 – ${AUTHOR}
     - Initial version
@@ -157,7 +183,7 @@ show_changelog() {
     - Dry-run / simulate mode
 
 ================================================================================
-EOF
+EOF_CHANGELOG
 }
 
 # =============================================================================
@@ -167,12 +193,15 @@ check_prereqs() {
     log "Checking runtime prerequisites..."
     local ok=true
 
+    # Check install root policy
+    check_install_root
+
     # Check venv
     if [[ -d "${VENV_DIR}" && -f "${VENV_DIR}/bin/activate" ]]; then
         log "  [OK]      venv found at ${VENV_DIR}"
     else
         log "  [MISSING] venv not found at ${VENV_DIR}"
-        log "            Run: ./install.sh --exec  to create it"
+        log "            Run: ${INSTALL_ROOT}/install.sh --exec  to create it"
         ok=false
     fi
 
@@ -181,7 +210,7 @@ check_prereqs() {
         log "  [OK]      friture binary present in venv"
     else
         log "  [MISSING] friture not installed in venv"
-        log "            Run: ./install.sh --exec"
+        log "            Run: ${INSTALL_ROOT}/install.sh --exec"
         ok=false
     fi
 
@@ -194,7 +223,7 @@ check_prereqs() {
         log "            Run: arecord -l  to check available devices"
     fi
 
-    # Check python3 display (DISPLAY env)
+    # Check DISPLAY env for GUI
     if [[ -n "${DISPLAY:-}" ]]; then
         log "  [OK]      DISPLAY set to ${DISPLAY}"
     else
@@ -214,11 +243,11 @@ check_prereqs() {
 # INSTALL FALLBACK
 # =============================================================================
 do_install() {
-    if [[ -f "${SCRIPT_DIR}/install.sh" ]]; then
-        log "Delegating to install.sh --exec..."
-        bash "${SCRIPT_DIR}/install.sh" --exec
+    if [[ -f "${INSTALL_ROOT}/install.sh" ]]; then
+        log "Delegating to fixed installer: ${INSTALL_ROOT}/install.sh --exec"
+        bash "${INSTALL_ROOT}/install.sh" --exec
     else
-        log "[ERROR] install.sh not found in ${SCRIPT_DIR}"
+        log "[ERROR] install.sh not found at ${INSTALL_ROOT}/install.sh"
         exit 1
     fi
 }
@@ -259,15 +288,19 @@ do_exec() {
     log "  ${SCRIPT_NAME} ${SCRIPT_VERSION} – START"
     log "========================================"
 
-    # Step 1 – Check venv
+    # Step 1 – Check installation root
+    step "Checking fixed installation root"
+    check_install_root
+
+    # Step 2 – Check venv
     step "Verifying venv at ${VENV_DIR}"
     if [[ ! -d "${VENV_DIR}" || ! -f "${VENV_DIR}/bin/activate" ]]; then
-        log "[ERROR] venv not found. Run: ./install.sh --exec"
+        log "[ERROR] venv not found. Run: ${INSTALL_ROOT}/install.sh --exec"
         exit 1
     fi
     log "  venv OK"
 
-    # Step 2 – Check Blue Yeti
+    # Step 3 – Check Blue Yeti
     step "Checking Blue Yeti ALSA device"
     if arecord -l 2>/dev/null | grep -qi "Yeti"; then
         log "  ${YETI_NAME} detected – OK"
@@ -275,7 +308,7 @@ do_exec() {
         log "  [WARN] ${YETI_NAME} not found by ALSA. Select input manually in Friture."
     fi
 
-    # Step 3 – Activate venv
+    # Step 4 – Activate venv
     step "Activating venv"
     if [[ "${SIMULATE}" == true ]]; then
         log "[SIMULATE] Would activate: source ${VENV_DIR}/bin/activate"
@@ -285,7 +318,7 @@ do_exec() {
         log "  venv activated"
     fi
 
-    # Step 4 – Launch Friture
+    # Step 5 – Launch Friture
     step "Launching Friture"
     if [[ "${SIMULATE}" == true ]]; then
         log "[SIMULATE] Would run: friture"
@@ -306,18 +339,21 @@ do_exec() {
 
     echo ""
     echo "Actions performed:"
-    echo "  1. venv existence verified"
-    echo "  2. Blue Yeti ALSA check"
-    echo "  3. venv activated"
-    echo "  4. Friture launched"
+    echo "  1. Installation root policy check"
+    echo "  2. venv existence verified"
+    echo "  3. Blue Yeti ALSA check"
+    echo "  4. venv activated"
+    echo "  5. Friture launched"
 }
 
 # =============================================================================
 # PURGE
 # =============================================================================
 do_purge() {
-    log "Purging ./logs and ./results..."
+    init_dirs
+    log "Purging logs and results in fixed installation root..."
     rm -rf "${LOGS_DIR}" "${RESULTS_DIR}"
+    mkdir -p "${LOGS_DIR}"
     log "Done."
 }
 
@@ -361,7 +397,6 @@ while [[ $# -gt 0 ]]; do
             DO_EXEC=true
             ;;
         --purge|-pu)
-            init_dirs
             do_purge
             exit 0
             ;;

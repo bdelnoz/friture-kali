@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Script      : /home/nox/Projects/friture-kali/install.sh
+# Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/install.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.0.0
+# Version     : v1.1.0
 # Date        : 2026-04-25
-# Target      : Install Friture audio spectrum analyzer in isolated Python venv
-#               on Kali Linux with Blue Yeti USB microphone support
+# Target      : Install Friture audio spectrum analyzer in a dedicated Python
+#               venv for Kali Linux at a fixed project installation folder
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.1.0 – 2026-04-25 – Fixed installation root and venv location for Kali
+#               - fixed INSTALL_ROOT path to /mnt/data2_78g/.../friture-kali
+#               - venv now created in INSTALL_ROOT/venv/friture
+#               - safer log handling for purge and early logging calls
+#               - help/defaults synchronized with fixed installation policy
 #   v1.0.0 – 2026-04-25 – Initial version
 #               - venv creation with --system-site-packages
 #               - pip install friture
@@ -24,24 +29,26 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="install.sh"
-SCRIPT_VERSION="v1.0.0"
+SCRIPT_VERSION="v1.1.0"
 SCRIPT_DATE="2026-04-25"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
 
-VENV_DIR="${HOME}/venv/friture"
-LOGS_DIR="$(cd "$(dirname "$0")" && pwd)/logs"
-RESULTS_DIR="$(cd "$(dirname "$0")" && pwd)/results"
+INSTALL_ROOT="/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV_DIR="${INSTALL_ROOT}/venv/friture"
+LOGS_DIR="${INSTALL_ROOT}/logs"
+RESULTS_DIR="${INSTALL_ROOT}/results"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 LOG_FILE="${LOGS_DIR}/log.${SCRIPT_NAME}.${TIMESTAMP}.${SCRIPT_VERSION}.log"
 
 SIMULATE=false
+DO_EXEC=false
 STEP=0
 TOTAL_STEPS=6
 
 # System packages required
-SYS_DEPS=("python3-venv" "python3-pyqt5" "python3-pyqt5.qtopengl")
+SYS_DEPS=("python3-venv" "python3-pyqt5" "python3-pyqt5.qtopengl" "python3-pip")
 
 # =============================================================================
 # INTERNAL FUNCTIONS
@@ -56,17 +63,19 @@ ensure_sudo() {
 
 # Initialize log and result directories
 init_dirs() {
-    mkdir -p "${LOGS_DIR}" "${RESULTS_DIR}"
+    mkdir -p "${INSTALL_ROOT}" "${LOGS_DIR}" "${RESULTS_DIR}"
     # Append /logs and /results to .gitignore if present
-    local gitignore="${SCRIPT_DIR}/.gitignore"
+    local gitignore="${INSTALL_ROOT}/.gitignore"
     if [[ -f "${gitignore}" ]]; then
         grep -qxF '/logs' "${gitignore}" || echo -e "\n# Added automatically by ${SCRIPT_NAME}\n/logs" >> "${gitignore}"
         grep -qxF '/results' "${gitignore}" || echo "/results" >> "${gitignore}"
+        grep -qxF '/venv' "${gitignore}" || echo "/venv" >> "${gitignore}"
     fi
 }
 
 # Log message to file and stdout
 log() {
+    mkdir -p "${LOGS_DIR}"
     local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
     echo "${msg}"
     echo "${msg}" >> "${LOG_FILE}"
@@ -90,17 +99,28 @@ run_cmd() {
     fi
 }
 
+# Verify fixed project installation folder
+check_install_root() {
+    if [[ "${SCRIPT_DIR}" != "${INSTALL_ROOT}" ]]; then
+        log "[WARN] Script current location: ${SCRIPT_DIR}"
+        log "[WARN] Required installation root: ${INSTALL_ROOT}"
+        log "[WARN] The script will still use fixed paths under ${INSTALL_ROOT}."
+    else
+        log "[OK] Script is running from fixed installation root: ${INSTALL_ROOT}"
+    fi
+}
+
 # =============================================================================
 # HELP
 # =============================================================================
 show_help() {
-    cat <<EOF
+    cat <<EOF_HELP
 ================================================================================
   ${SCRIPT_NAME} – ${SCRIPT_VERSION} – ${AUTHOR} <${EMAIL}>
 ================================================================================
 
 DESCRIPTION
-  Installs Friture audio spectrum analyzer inside an isolated Python venv
+  Installs Friture audio spectrum analyzer inside a dedicated Python venv
   on Kali Linux. Handles system dependencies and venv creation.
 
 USAGE
@@ -113,7 +133,7 @@ OPTIONS
   --install,   -i    Install missing system prerequisites via apt
   --simulate,  -s    Dry-run mode (no actual changes made)
   --changelog, -ch   Show full changelog
-  --purge,     -pu   Remove ./logs and ./results directories
+  --purge,     -pu   Remove ./logs and ./results directories in INSTALL_ROOT
   --stop,      -st   (N/A for install script)
 
 EXAMPLES
@@ -121,7 +141,7 @@ EXAMPLES
   ./${SCRIPT_NAME} --prerequis
 
   # Install missing system deps
-  sudo ./${SCRIPT_NAME} --install
+  ./${SCRIPT_NAME} --install
 
   # Full installation (recommended)
   ./${SCRIPT_NAME} --exec
@@ -133,26 +153,33 @@ EXAMPLES
   ./${SCRIPT_NAME} --prerequis && ./${SCRIPT_NAME} --install && ./${SCRIPT_NAME} --exec
 
 DEFAULTS
-  VENV_DIR    : ${HOME}/venv/friture
-  LOGS_DIR    : ./logs
-  RESULTS_DIR : ./results
+  INSTALL_ROOT : ${INSTALL_ROOT}
+  VENV_DIR     : ${VENV_DIR}
+  LOGS_DIR     : ${LOGS_DIR}
+  RESULTS_DIR  : ${RESULTS_DIR}
 
 NOTES
   - Requires Kali Linux with apt
   - Uses --system-site-packages to reuse python3-pyqt5 from system
   - No external sudo required (sudo is handled internally)
 ================================================================================
-EOF
+EOF_HELP
 }
 
 # =============================================================================
 # CHANGELOG
 # =============================================================================
 show_changelog() {
-    cat <<EOF
+    cat <<EOF_CHANGELOG
 ================================================================================
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
+
+  v1.1.0 – 2026-04-25 – ${AUTHOR}
+    - Fixed installation root to ${INSTALL_ROOT}
+    - Venv moved to ${VENV_DIR}
+    - Added install root validation and informative warnings
+    - Improved log safety for purge and early execution paths
 
   v1.0.0 – 2026-04-25 – ${AUTHOR}
     - Initial version
@@ -166,7 +193,7 @@ show_changelog() {
     - Dry-run / simulate mode
 
 ================================================================================
-EOF
+EOF_CHANGELOG
 }
 
 # =============================================================================
@@ -229,6 +256,9 @@ do_exec() {
     log "  ${SCRIPT_NAME} ${SCRIPT_VERSION} – START"
     log "========================================"
 
+    step "Checking fixed installation root"
+    check_install_root
+
     # Step 1 – Check prereqs
     step "Checking system prerequisites"
     if ! check_prereqs; then
@@ -240,6 +270,7 @@ do_exec() {
     if [[ -d "${VENV_DIR}" ]]; then
         log "  venv already exists at ${VENV_DIR} – skipping creation"
     else
+        mkdir -p "$(dirname "${VENV_DIR}")"
         run_cmd "python3 -m venv" python3 -m venv "${VENV_DIR}" --system-site-packages
         log "  venv created at ${VENV_DIR}"
     fi
@@ -270,6 +301,7 @@ do_exec() {
             echo "friture-kali installation summary"
             echo "Date        : $(date '+%Y-%m-%d %H:%M:%S')"
             echo "Script      : ${SCRIPT_NAME} ${SCRIPT_VERSION}"
+            echo "INSTALL_ROOT: ${INSTALL_ROOT}"
             echo "VENV_DIR    : ${VENV_DIR}"
             echo "Friture ver : $(pip show friture 2>/dev/null | grep Version || echo 'unknown')"
         } > "${result_file}"
@@ -279,26 +311,29 @@ do_exec() {
     log "========================================"
     log "  INSTALLATION COMPLETE"
     log "  To launch: source ${VENV_DIR}/bin/activate && friture"
-    log "  Or use   : ./run.sh --exec"
+    log "  Or use   : ${INSTALL_ROOT}/run.sh --exec"
     log "========================================"
 
     # Post-execution summary
     echo ""
     echo "Actions performed:"
-    echo "  1. Prerequisite check"
-    echo "  2. venv creation at ${VENV_DIR}"
-    echo "  3. venv activation"
-    echo "  4. pip upgrade"
-    echo "  5. friture installed via pip"
-    echo "  6. Result summary written"
+    echo "  1. Installation root check"
+    echo "  2. Prerequisite check"
+    echo "  3. venv creation at ${VENV_DIR}"
+    echo "  4. venv activation"
+    echo "  5. pip upgrade"
+    echo "  6. friture installed via pip"
+    echo "  7. Result summary written"
 }
 
 # =============================================================================
 # PURGE
 # =============================================================================
 do_purge() {
-    log "Purging ./logs and ./results..."
+    init_dirs
+    log "Purging logs and results in fixed installation root..."
     rm -rf "${LOGS_DIR}" "${RESULTS_DIR}"
+    mkdir -p "${LOGS_DIR}"
     log "Done."
 }
 
@@ -324,6 +359,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --prerequis|-pr)
             init_dirs
+            check_install_root
             check_prereqs
             exit $?
             ;;
@@ -337,10 +373,10 @@ while [[ $# -gt 0 ]]; do
             SIMULATE=true
             ;;
         --exec|-exe)
-            # Handled below after full arg parse
             DO_EXEC=true
             ;;
         --stop|-st)
+            init_dirs
             log "--stop not applicable for install script."
             exit 0
             ;;
@@ -358,7 +394,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Execute if requested
-if [[ "${DO_EXEC:-false}" == true ]]; then
+if [[ "${DO_EXEC}" == true ]]; then
     init_dirs
     do_exec
 fi
