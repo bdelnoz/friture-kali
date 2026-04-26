@@ -2,10 +2,29 @@
 Document : CHANGELOG.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.3.0
-Date : 2026-04-25 12:45
+Version : v1.4.0
+Date : 2026-04-26 00:00
 -->
 # CHANGELOG
+
+## v1.4.0 — 2026-04-26 00:00 — Bruno DELNOZ
+
+### Added
+- Added runtime candidate resolution in `run.sh` for pipenv installer alignment:
+  - `${INSTALL_ROOT}/.venv/bin/friture`
+  - `pipenv run friture`
+  - system `friture` fallback.
+- Added synchronized specification updates in `SPECIFICATIONS.md` and `SPECIFICATIONS_FR.md` for pipenv workflow and no-change policy on `install.sh`.
+
+### Changed
+- Updated `run.sh` to `v1.3.0`:
+  - switched expected venv location from `venv/friture` to `.venv`.
+  - removed mandatory venv activation before launch.
+  - launch now resolves and executes the first valid runtime candidate.
+- Updated `README.md`, `INSTALL.md`, and `WHY.md` to document the current pipenv-based installer behavior.
+
+### Removed
+- Removed fixed `venv/friture` path as primary runtime requirement from specifications and documentation.
 
 ## v1.3.0 — 2026-04-25 12:45 — Bruno DELNOZ
 

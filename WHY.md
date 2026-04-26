@@ -2,8 +2,8 @@
 Document : WHY.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.3.0
-Date : 2026-04-25 12:45
+Version : v1.4.0
+Date : 2026-04-26 00:00
 -->
 # WHY
 
@@ -15,17 +15,13 @@ Date : 2026-04-25 12:45
 
 A fixed installation root improves reproducibility on the target machine and avoids path drift between installations.
 
-## Why a dedicated venv
+## Why a dedicated local pipenv environment
 
-Kali environments can be sensitive to system Python package management. A dedicated project venv isolates package installation while still allowing required system Qt packages through `--system-site-packages`.
+Kali environments can be sensitive to system Python package management. A pipenv-managed project environment (`.venv`) isolates package installation while keeping operational behavior reproducible.
 
-## Why Python compatibility detection
+## Why upstream install through pipenv
 
-Some backend dependencies used during pip builds for Friture are not compatible with Python 3.13 yet (for example legacy modules removed from stdlib). Detecting and using Python `< 3.13` prevents these failures.
-
-## Why apt-first installation for Friture
-
-Preferring the distro package (`apt install friture`) is more stable on rolling distributions and avoids fragile source builds.
+Using `pipenv run pip install git+https://github.com/tlecomte/friture.git@master` aligns installation with the current maintained upstream source strategy used by `install.sh`.
 
 ## Why explicit shell scripts
 

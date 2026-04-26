@@ -2,8 +2,8 @@
 Document : SPECIFICATIONS_FR.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.3.0
-Date : 2026-04-25 12:45
+Version : v1.4.0
+Date : 2026-04-26 00:00
 -->
 # SPECIFICATIONS_FR.md
 
@@ -17,8 +17,8 @@ Cette spécification couvre :
 
 - le comportement et la maintenance de `install.sh`
 - le comportement et la maintenance de `run.sh`
-- les exigences de dossier d'installation fixe et de venv fixe
-- la stratégie de compatibilité runtime Python pour l'installation de Friture
+- les exigences de dossier d'installation fixe
+- le flux d'installation et d'exécution basé sur pipenv
 - les documents compagnons obligatoires
 - les logs et artefacts de résultats
 
@@ -41,35 +41,36 @@ Fichiers racine actuels :
 - `CHANGELOG.md`
 - `INSTALL.md`
 - `WHY.md`
-- `install.sh`
+- `install.sh` (référence uniquement dans cette tâche, aucune modification)
 - `run.sh`
 
 ### Politique d'installation fixe
 
 - Le dossier d'installation est fixé à :
   - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali`
-- L'environnement virtuel est fixé à :
-  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/venv/friture`
+- L'environnement virtuel local pipenv est attendu à :
+  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/.venv`
 
 ### `install.sh`
 
 - supporte : `--help`, `--exec`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`, `--stop`
-- vérifie/installe les prérequis apt (`python3-venv`, `python3-pyqt5`, `python3-pyqt5.qtopengl`, `python3-pip`)
-- crée et utilise le chemin venv fixe
-- sélectionne un interpréteur compatible `< 3.13` pour créer le venv
-- installe Friture avec stratégie apt-first :
-  - priorité à `apt install friture`
-  - fallback vers `pip install friture` seulement si le paquet apt est indisponible et si l'interpréteur est compatible
+- la version courante indiquée est `v1.6.0` (datée `2026-04-26`)
+- vérifie/installe les prérequis apt (`pipenv`, `python3-pyqt5`, `python3-pyqt5.qtopengl`, `git`)
+- crée/utilise un `.venv` local de projet via pipenv
+- installe Friture depuis l'upstream via :
+  - `pipenv run pip install git+https://github.com/tlecomte/friture.git@master`
 - écrit les logs dans `./logs`
 - écrit un résumé d'exécution dans `./results`
 
 ### `run.sh`
 
 - supporte : `--help`, `--exec`, `--stop`, `--prerequis`, `--install`, `--simulate`, `--changelog`, `--purge`
-- valide le dossier d'installation fixe et le venv fixe
+- valide le dossier d'installation fixe
+- valide des candidats runtime compatibles pipenv
 - vérifie optionnellement la présence ALSA du Blue Yeti
-- accepte la commande Friture depuis :
-  - `${INSTALL_ROOT}/venv/friture/bin/friture`
+- accepte la commande Friture depuis l'un de :
+  - `${INSTALL_ROOT}/.venv/bin/friture`
+  - `pipenv run friture` (quand `Pipfile` existe)
   - le PATH système (`/usr/bin/friture` ou équivalent)
 - gère le PID via `/tmp/friture.pid`
 - écrit les logs dans `./logs`
@@ -78,13 +79,13 @@ Fichiers racine actuels :
 
 1. Les scripts DOIVENT conserver le comportement CLI documenté et les options.
 2. Les scripts DOIVENT imposer/utiliser les chemins de dossier d'installation fixes.
-3. Les scripts DOIVENT utiliser le chemin venv fixe du projet.
+3. `run.sh` DOIT aligner le lancement runtime avec l'état d'installation pipenv.
 4. Toute mise à jour script DOIT inclure version/date/changelog.
 5. Les tâches liées aux scripts DOIVENT synchroniser `README.md`, `CHANGELOG.md`, `INSTALL.md`, `WHY.md`.
 6. `SPECIFICATIONS.md` et `SPECIFICATIONS_FR.md` DOIVENT rester synchronisés (version/date/sens).
-7. L'installation de Friture DOIT privilégier apt pour compatibilité Python 3.13.
-8. Le fallback pip DOIT être bloqué si seul Python 3.13+ est disponible.
-9. La validation runtime DOIT accepter la commande `friture` installée système.
+7. La documentation DOIT décrire le flux pipenv comme référence.
+8. `install.sh` NE DOIT PAS être modifié dans cette tâche (état validé par l'utilisateur).
+9. La validation runtime DOIT accepter le fallback système `friture` s'il est disponible.
 
 ## Exigences non fonctionnelles
 
@@ -98,6 +99,7 @@ Fichiers racine actuels :
 
 - options CLI de `install.sh` et `run.sh`
 - état local des paquets apt/système
+- état local pipenv/.venv
 - état local des périphériques ALSA
 - état local du dépôt
 
@@ -110,7 +112,7 @@ Fichiers racine actuels :
 
 ## Fichiers et répertoires concernés
 
-- `install.sh`
+- `install.sh` (référence uniquement dans cette tâche, aucune modification)
 - `run.sh`
 - `README.md`
 - `CHANGELOG.md`
@@ -120,6 +122,9 @@ Fichiers racine actuels :
 - `SPECIFICATIONS_FR.md`
 - `./logs/`
 - `./results/`
+- `./.venv/`
+- `./Pipfile`
+- `./Pipfile.lock` (si généré)
 
 ## Interfaces et commandes
 
@@ -137,20 +142,18 @@ Vérifications :
 - éviter les actions destructives par défaut
 - préserver l'historique des changelogs (append-only)
 - maintenir les livrables dépôt en anglais sauf `SPECIFICATIONS_FR.md`
+- ne pas modifier `install.sh` dans le périmètre de cette demande
 
 ## Validation et critères d'acceptation
 
 La tâche est acceptée quand :
 
-1. les scripts implémentent la politique de dossier racine fixe et venv fixe,
-2. la metadata/version/changelog scripts sont mis à jour,
-3. la détection d'interpréteur compatible (<3.13) est implémentée pour créer le venv,
-4. la stratégie d'installation apt-first de Friture est implémentée,
-5. le fallback pip est bloqué sur Python 3.13+,
-6. le runtime accepte la commande système Friture si binaire venv absent,
-7. les documents compagnons obligatoires existent et sont synchronisés,
-8. `SPECIFICATIONS.md` et `SPECIFICATIONS_FR.md` sont synchronisés,
-9. les vérifications de syntaxe passent.
+1. le comportement de `run.sh` est compatible avec le flux pipenv actuel de `install.sh`,
+2. les métadonnées version/changelog/date de `run.sh` sont mises à jour,
+3. `README.md`, `INSTALL.md`, `WHY.md`, `CHANGELOG.md` sont synchronisés avec le flux pipenv,
+4. `SPECIFICATIONS.md` et `SPECIFICATIONS_FR.md` sont synchronisés,
+5. `install.sh` reste inchangé,
+6. les vérifications de syntaxe passent.
 
 ## Hors périmètre
 
@@ -159,6 +162,22 @@ La tâche est acceptée quand :
 - ajout de traitement cloud/web externe
 
 ## Changelog
+
+### v1.4.0 — 2026-04-26 00:00 — Bruno DELNOZ
+
+Raison/contexte :
+- L'utilisateur confirme que `install.sh` a été modifié manuellement et ne doit pas être touché ; il demande la mise à jour de `run.sh` et des documents Markdown.
+
+Ajouts :
+- Ajout des exigences de synchronisation runtime/doc orientées pipenv.
+- Ajout de la contrainte explicite de non-modification de `install.sh` dans cette tâche.
+
+Modifications :
+- Mise à jour du comportement d'installation vérifié : stratégie `.venv` pipenv en référence principale.
+- Mise à jour des exigences runtime et documentation pour refléter le chemin de lancement pipenv.
+
+Suppressions :
+- Retrait de la dépendance normative au chemin fixe `venv/friture` comme référence principale runtime.
 
 ### v1.3.0 — 2026-04-25 12:45 — Bruno DELNOZ
 

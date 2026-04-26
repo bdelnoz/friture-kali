@@ -2,8 +2,8 @@
 Document : INSTALL.md
 Author : Bruno DELNOZ
 Email : bruno.delnoz@protonmail.com
-Version : v1.3.0
-Date : 2026-04-25 12:45
+Version : v1.4.0
+Date : 2026-04-26 00:00
 -->
 # INSTALL
 
@@ -44,9 +44,10 @@ cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
 ```
 
 `--exec` will:
-- select a compatible Python interpreter `< 3.13` for venv creation,
-- prefer `apt install friture`,
-- fallback to `pip install friture` only if apt package is unavailable and Python is compatible.
+- install and verify pipenv-based prerequisites,
+- create/use the local project virtual environment `.venv`,
+- install Friture from upstream using:
+  - `pipenv run pip install git+https://github.com/tlecomte/friture.git@master`.
 
 5. Launch Friture:
 
@@ -56,7 +57,7 @@ cd /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali
 
 ## Notes
 
-- The virtual environment is created at:
-  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/venv/friture`
+- The local pipenv virtual environment is expected at:
+  - `/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/.venv`
 - Logs are written in `./logs`.
 - Result summaries are written in `./results`.
