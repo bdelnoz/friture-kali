@@ -3,12 +3,17 @@
 # Script      : /mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali/run.sh
 # Author      : Bruno DELNOZ
 # Email       : bruno.delnoz@protonmail.com
-# Version     : v1.2.0
-# Date        : 2026-04-25
+# Version     : v1.3.0
+# Date        : 2026-04-26
 # Target      : Launch Friture from fixed Kali project installation root using
-#               a dedicated Python venv and optional Blue Yeti checks
+#               pipenv/.venv runtime and optional Blue Yeti checks
 # -----------------------------------------------------------------------------
 # Changelog   :
+#   v1.3.0 – 2026-04-26 – Align runtime with pipenv installer workflow
+#               - prefer .venv/bin/friture when available
+#               - fallback to `pipenv run friture` when pipenv is installed
+#               - keep system `friture` fallback if available
+#               - synchronize run flow with install.sh v1.6.0 behavior
 #   v1.2.0 – 2026-04-25 – Runtime compatibility with apt-based install
 #               - accept system `friture` command when venv binary is absent
 #               - keep fixed installation root and fixed venv policy
@@ -31,14 +36,14 @@ set -euo pipefail
 # CONSTANTS
 # =============================================================================
 SCRIPT_NAME="run.sh"
-SCRIPT_VERSION="v1.2.0"
-SCRIPT_DATE="2026-04-25"
+SCRIPT_VERSION="v1.3.0"
+SCRIPT_DATE="2026-04-26"
 AUTHOR="Bruno DELNOZ"
 EMAIL="bruno.delnoz@protonmail.com"
 
 INSTALL_ROOT="/mnt/data2_78g/Security/scripts/Projects_multimedia/friture-kali"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VENV_DIR="${INSTALL_ROOT}/venv/friture"
+VENV_DIR="${INSTALL_ROOT}/.venv"
 LOGS_DIR="${INSTALL_ROOT}/logs"
 RESULTS_DIR="${INSTALL_ROOT}/results"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
@@ -66,7 +71,7 @@ init_dirs() {
     if [[ -f "${gitignore}" ]]; then
         grep -qxF '/logs' "${gitignore}" || echo -e "\n# Added automatically by ${SCRIPT_NAME}\n/logs" >> "${gitignore}"
         grep -qxF '/results' "${gitignore}" || echo "/results" >> "${gitignore}"
-        grep -qxF '/venv' "${gitignore}" || echo "/venv" >> "${gitignore}"
+        grep -qxF '/.venv' "${gitignore}" || echo "/.venv" >> "${gitignore}"
     fi
 }
 
@@ -117,16 +122,16 @@ show_help() {
 
 DESCRIPTION
   Launches Friture audio spectrum analyzer from the fixed installation root
-  and fixed Python venv path on Kali Linux.
+  using pipenv/.venv runtime resolution on Kali Linux.
 
 USAGE
   ./${SCRIPT_NAME} [OPTION]
 
 OPTIONS
   --help,      -h    Show this help and exit
-  --exec,      -exe  Launch Friture (activate venv + start app)
+  --exec,      -exe  Launch Friture from .venv / pipenv / system fallback
   --stop,      -st   Kill running Friture instance
-  --prerequis, -pr   Check venv and ALSA device availability
+  --prerequis, -pr   Check runtime candidates and ALSA device availability
   --install,   -i    Re-run install.sh if venv missing
   --simulate,  -s    Dry-run mode (no actual launch)
   --changelog, -ch   Show full changelog
@@ -136,7 +141,7 @@ EXAMPLES
   # Launch Friture
   ./${SCRIPT_NAME} --exec
 
-  # Check venv + Blue Yeti before launching
+  # Check runtime + Blue Yeti before launching
   ./${SCRIPT_NAME} --prerequis && ./${SCRIPT_NAME} --exec
 
   # Dry-run (no actual launch)
@@ -147,13 +152,14 @@ EXAMPLES
 
 DEFAULTS
   INSTALL_ROOT : ${INSTALL_ROOT}
-  VENV_DIR     : ${VENV_DIR}
+  PIPENV_VENV  : ${VENV_DIR}
   ALSA device  : ${YETI_ALSA} (${YETI_NAME})
   LOGS_DIR     : ${LOGS_DIR}
   RESULTS_DIR  : ${RESULTS_DIR}
 
 NOTES
   - Friture must be installed first via: ${INSTALL_ROOT}/install.sh --exec
+  - Runtime order: ${VENV_DIR}/bin/friture -> pipenv run friture -> system friture
   - Select input device inside Friture: Preferences → Input device → Yeti
   - No external sudo required
 ================================================================================
@@ -168,6 +174,12 @@ show_changelog() {
 ================================================================================
   CHANGELOG – ${SCRIPT_NAME}
 ================================================================================
+
+  v1.3.0 – 2026-04-26 – ${AUTHOR}
+    - Prefer ${VENV_DIR}/bin/friture when available
+    - Fallback to `pipenv run friture` if pipenv is present
+    - Keep system `friture` fallback in PATH
+    - Align runtime checks with install.sh pipenv workflow
 
   v1.2.0 – 2026-04-25 – ${AUTHOR}
     - Accept system `friture` command when venv binary is absent
@@ -203,22 +215,26 @@ check_prereqs() {
     # Check install root policy
     check_install_root
 
-    # Check venv
+    # Check pipenv-managed .venv
     if [[ -d "${VENV_DIR}" && -f "${VENV_DIR}/bin/activate" ]]; then
-        log "  [OK]      venv found at ${VENV_DIR}"
+        log "  [OK]      pipenv .venv found at ${VENV_DIR}"
     else
-        log "  [MISSING] venv not found at ${VENV_DIR}"
-        log "            Run: ${INSTALL_ROOT}/install.sh --exec  to create it"
-        ok=false
+        log "  [WARN]    pipenv .venv not found at ${VENV_DIR}"
     fi
 
-    # Check friture command availability
+    # Check launch candidates in deterministic order
     if [[ -f "${VENV_DIR}/bin/friture" ]]; then
-        log "  [OK]      friture binary present in venv"
+        log "  [OK]      launch candidate #1: ${VENV_DIR}/bin/friture"
+    elif command -v pipenv &>/dev/null && [[ -f "${INSTALL_ROOT}/Pipfile" ]]; then
+        log "  [OK]      launch candidate #2: pipenv run friture"
     elif command -v friture &>/dev/null; then
-        log "  [OK]      friture command available in system PATH ($(command -v friture))"
+        log "  [OK]      launch candidate #3: system PATH ($(command -v friture))"
     else
-        log "  [MISSING] friture not found in venv and not available in system PATH"
+        log "  [MISSING] no valid runtime candidate found"
+        log "            Expected one of:"
+        log "            - ${VENV_DIR}/bin/friture"
+        log "            - pipenv run friture (with Pipfile)"
+        log "            - system friture in PATH"
         log "            Run: ${INSTALL_ROOT}/install.sh --exec"
         ok=false
     fi
@@ -301,13 +317,26 @@ do_exec() {
     step "Checking fixed installation root"
     check_install_root
 
-    # Step 2 – Check venv
-    step "Verifying venv at ${VENV_DIR}"
-    if [[ ! -d "${VENV_DIR}" || ! -f "${VENV_DIR}/bin/activate" ]]; then
-        log "[ERROR] venv not found. Run: ${INSTALL_ROOT}/install.sh --exec"
+    # Step 2 – Resolve launch command
+    local launch_mode=""
+    local launch_cmd=()
+    step "Resolving Friture launch candidate"
+    if [[ -x "${VENV_DIR}/bin/friture" ]]; then
+        launch_mode="venv-binary"
+        launch_cmd=("${VENV_DIR}/bin/friture")
+        log "  Using ${VENV_DIR}/bin/friture"
+    elif command -v pipenv &>/dev/null && [[ -f "${INSTALL_ROOT}/Pipfile" ]]; then
+        launch_mode="pipenv"
+        launch_cmd=(pipenv run friture)
+        log "  Using pipenv runtime from ${INSTALL_ROOT}/Pipfile"
+    elif command -v friture &>/dev/null; then
+        launch_mode="system-path"
+        launch_cmd=("$(command -v friture)")
+        log "  Using system command ${launch_cmd[0]}"
+    else
+        log "[ERROR] No launch candidate resolved. Run: ${INSTALL_ROOT}/install.sh --exec"
         exit 1
     fi
-    log "  venv OK"
 
     # Step 3 – Check Blue Yeti
     step "Checking Blue Yeti ALSA device"
@@ -317,23 +346,26 @@ do_exec() {
         log "  [WARN] ${YETI_NAME} not found by ALSA. Select input manually in Friture."
     fi
 
-    # Step 4 – Activate venv
-    step "Activating venv"
-    if [[ "${SIMULATE}" == true ]]; then
-        log "[SIMULATE] Would activate: source ${VENV_DIR}/bin/activate"
+    # Step 4 – Runtime readiness
+    step "Preparing runtime context"
+    if [[ "${launch_mode}" == "pipenv" ]]; then
+        if [[ "${SIMULATE}" == true ]]; then
+            log "[SIMULATE] Would run from INSTALL_ROOT with pipenv"
+        else
+            cd "${INSTALL_ROOT}"
+            log "  Runtime context set to ${INSTALL_ROOT} for pipenv"
+        fi
     else
-        # shellcheck disable=SC1090
-        source "${VENV_DIR}/bin/activate"
-        log "  venv activated"
+        log "  No extra runtime preparation required (${launch_mode})"
     fi
 
     # Step 5 – Launch Friture
     step "Launching Friture"
     if [[ "${SIMULATE}" == true ]]; then
-        log "[SIMULATE] Would run: friture"
+        log "[SIMULATE] Would run: ${launch_cmd[*]}"
     else
-        log "  Starting Friture..."
-        friture &
+        log "  Starting Friture with mode ${launch_mode}..."
+        "${launch_cmd[@]}" &
         local pid=$!
         echo "${pid}" > "${FRITURE_PID_FILE}"
         log "  Friture launched (PID ${pid})"
@@ -349,9 +381,9 @@ do_exec() {
     echo ""
     echo "Actions performed:"
     echo "  1. Installation root policy check"
-    echo "  2. venv existence verified"
+    echo "  2. Launch candidate resolved"
     echo "  3. Blue Yeti ALSA check"
-    echo "  4. venv activated"
+    echo "  4. Runtime context prepared"
     echo "  5. Friture launched"
 }
 
