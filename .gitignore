@@ -31,3 +31,7 @@ secrets/
 /logs
 /results
 /venv
+
+# Added automatically by install.sh
+/.venv
+/Pipfile.lock
